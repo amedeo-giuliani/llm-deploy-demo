@@ -1,0 +1,23 @@
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[[services]]
+name = "backend"
+source = "./backend"
+
+[services.variables]
+OLLAMA_HOST = "http://localhost:11434"
+MODEL_NAME = "smollm2:135m"
+
+[[services]]
+name = "frontend"
+source = "./frontend"
+
+[services.variables]
+BACKEND_URL = "${{services.backend.url}}"
