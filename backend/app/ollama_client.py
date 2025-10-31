@@ -36,3 +36,28 @@ class OllamaClient:
             return data.get("message", {}).get("content", "")
         except Exception as e:
             raise Exception(f"Failed to chat with model: {str(e)}")
+        
+    def chat_stream_with_model(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: int = 1024):
+        """Stream chat response from the Ollama model."""
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens
+            },
+            "stream": True
+        }
+        try:
+            with self.session.post(f"{self.host}/api/chat", json=payload, stream=True) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if line:
+                        try:
+                            data = json.loads(line)
+                            if "message" in data and "content" in data["message"]:
+                                yield data["message"]["content"]
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            raise Exception(f"Failed to stream chat with model: {str(e)}")

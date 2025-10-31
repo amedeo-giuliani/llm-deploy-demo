@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
 from .ollama_client import OllamaClient
@@ -45,16 +46,19 @@ async def health_check():
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Ollama server is unavailable: {str(e)}")
     
-@app.post("/chat", response_model=GenerateResponse)
+@app.post("/chat")
 async def chat(request: ChatRequest):
-    """Generate a response from the Ollama model based on chat messages."""
+    """Stream a response from the Ollama model based on chat messages."""
     try:
         messages_dict = [msg.dict() for msg in request.messages]
-        response = ollama_client.chat_with_model(
-            messages=messages_dict,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens
-        )
-        return GenerateResponse(response=response)
+
+        def token_generator():
+            for chunk in ollama_client.chat_stream_with_model(
+                messages=messages_dict,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens
+            ):
+                yield chunk
+        return StreamingResponse(token_generator(), media_type="text/plain")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate response: {str(e)}")

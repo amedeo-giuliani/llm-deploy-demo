@@ -33,6 +33,26 @@ def check_backend_health():
     except requests.exceptions.RequestException as e:
         st.error(f"Error connecting to backend: {str(e)}")
         return False, []
+    
+def stream_response(prompt, system_prompt, temperature, max_tokens):
+    """
+    Streams a response from the backend using the /chat endpoint.
+    """
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(st.session_state.messages)
+    messages.append({"role": "user", "content": prompt})
+
+    payload = {
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens
+    }
+    with requests.post(f"{BACKEND_URL}/chat", json=payload, stream=True) as response:
+        partial = ""
+        for chunk in response.iter_content(chunk_size=None):
+            text = chunk.decode("utf-8")
+            partial += text
+            yield text
 
 def generate_response(prompt, system_prompt, temperature, max_tokens):
     """
@@ -115,9 +135,9 @@ with st.sidebar:
     
     max_tokens = st.slider(
         "Max Tokens",
-        min_value=1,
-        max_value=300,
-        value=100,
+        min_value=256,
+        max_value=1024,
+        value=512,
         step=1,
         help="Maximum length of the generated response."
     )
@@ -146,18 +166,8 @@ else:
             full_response = ""
             
             with st.spinner("Thinking..."):
-                response = generate_response(
-                    prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-                
-                if response:
-                    full_response = response
-                    message_placeholder.markdown(full_response)
-                else:
-                    full_response = "Sorry, I couldn't generate a response. Please try again."
+                for token in stream_response(prompt, system_prompt, temperature, max_tokens):
+                    full_response += token
                     message_placeholder.markdown(full_response)
         
         # Add the assistant's response to the chat history
