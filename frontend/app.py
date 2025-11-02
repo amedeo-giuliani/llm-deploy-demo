@@ -14,6 +14,8 @@ st.set_page_config(
 # Get backend URL from environment variable or use default for local development
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
+MAX_HISTORY_PAIRS = 10  # Maximum number of message pairs to keep in history
+
 # Initialize session state for conversation history
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -172,6 +174,10 @@ else:
         
         # Add the assistant's response to the chat history
         st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+        # Limit the conversation history to the last MAX_HISTORY_PAIRS pairs
+        if len(st.session_state.messages) > MAX_HISTORY_PAIRS * 2:
+            st.session_state.messages = st.session_state.messages[-MAX_HISTORY_PAIRS * 2 :]
 
 # Button to clear the conversation history
 if st.button("Clear Chat"):
