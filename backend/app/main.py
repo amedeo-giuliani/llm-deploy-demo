@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
 from .ollama_client import OllamaClient
+from .openai_client import OpenRouterClient
 import os
 
 app = FastAPI(title="Ollama API", description="API to interact with Ollama language models")
@@ -16,9 +17,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-ollama_model = os.getenv("OLLAMA_MODEL", "tinyllama:latest")
-ollama_client = OllamaClient(host=ollama_host, model=ollama_model)
+# Determine which LLM provider to use. Default is Ollama.
+provider = os.getenv("LLM_PROVIDER", "ollama").lower()
+if provider == "openrouter":
+    # OpenRouter configuration via environment variables
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    print("OpenRouter API Key:", openrouter_api_key)
+    openrouter_model = os.getenv("OPENROUTER_MODEL", "z-ai/glm-4.5-air:free")
+    client = OpenRouterClient(api_key=openrouter_api_key, model=openrouter_model)
+else:
+    # Ollama configuration
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    ollama_model = os.getenv("OLLAMA_MODEL", "tinyllama:latest")
+    client = OllamaClient(host=ollama_host, model=ollama_model)
 
 class ChatMessage(BaseModel):
     role: str
@@ -41,7 +52,7 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     try:
-        models = ollama_client.list_models()
+        models = client.list_models()
         return {"status": "healthy", "models": models}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Ollama server is unavailable: {str(e)}")
@@ -53,7 +64,7 @@ async def chat(request: ChatRequest):
         messages_dict = [msg.dict() for msg in request.messages]
 
         def token_generator():
-            for chunk in ollama_client.chat_stream_with_model(
+            for chunk in client.chat_stream_with_model(
                 messages=messages_dict,
                 temperature=request.temperature,
                 max_tokens=request.max_tokens

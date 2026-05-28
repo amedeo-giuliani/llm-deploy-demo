@@ -1,9 +1,14 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
     ports:
       - "8000:8000"
     environment:
+      - LLM_PROVIDER=openrouter
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OLLAMA_HOST=http://localhost:11434
       - MODEL_NAME=tinyllama:latest
     healthcheck:
